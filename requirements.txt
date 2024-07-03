@@ -1,1 +1,2 @@
 gymnax
+gym[classic_control]
