@@ -27,7 +27,7 @@ class NormalDistPredictor(nn.Module):
         mean = nn.Dense(features = self.output_size)(x)
 
         logvar_param = self.param('logvar_param', lambda rng, shape: self.logvar_init_value * jnp.ones(shape), (1,))
-        std = jnp.exp(logvar_param / 2) * jnp.ones((self.output_size,))
+        std = jnp.exp(logvar_param / 2) * jnp.ones_like(mean)
         std = jnp.clip(std, 1e-10, 50)
 
         return mean, std

@@ -5,8 +5,8 @@ import jax
 from functools import partial
 
 class ActorCriticDiscrete:
-    def __init__(self, discount):
-        self.discount = discount
+    def __init__(self, advantage_estimator):
+        self.advantage_estimator = advantage_estimator
 
     # no need to vmap
     def sample_action(self, x, actor, key):
@@ -23,12 +23,9 @@ class ActorCriticDiscrete:
         return action_id
 
     @partial(jit, static_argnums=(0,))
-    def train_one_step(self, actor, critic, obs, expected_return, action_id, mask):
+    def train_one_step(self, actor, critic, obs, reward, action_id, done):
 
         action_id = jnp.astype(jnp.squeeze(action_id), jnp.int32)
-
-        def masked_mean(x, mask):
-            return (x * mask).sum() / mask.sum()
 
         def loss_func(params):
             actor_params, critic_params = params
@@ -39,11 +36,11 @@ class ActorCriticDiscrete:
             action_prob = jax.nn.softmax(action_logits, -1)[jnp.arange(action_id.shape[0]), action_id]
             action_prob = jnp.expand_dims(action_prob, -1)
 
-            advantage = expected_return - pred_return
+            advantage = self.advantage_estimator(pred_return, reward, done)
 
-            critic_loss = masked_mean(jnp.square(advantage), mask) / 2.0
+            critic_loss = jnp.square(advantage).mean() / 2.0
 
-            actor_loss = -masked_mean(jax.lax.stop_gradient(advantage) * jnp.log(action_prob + 1e-10), mask)
+            actor_loss = -(jax.lax.stop_gradient(advantage) * jnp.log(action_prob + 1e-10)).mean()
 
             return actor_loss + critic_loss, actor_loss
 
@@ -56,7 +53,3 @@ class ActorCriticDiscrete:
         critic = critic.apply_gradients(grads=critic_grads)
 
         return actor, critic, loss, aux
-
-    def scan_discounted_reward(self, carry, x):
-        v = x + self.discount * carry
-        return jnp.squeeze(v), v
