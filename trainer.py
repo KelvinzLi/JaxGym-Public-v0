@@ -16,24 +16,30 @@ class History:
 class Transition:
     obs: jax.Array
 
-def build_trainer(agent, env, env_params, obs_size, max_episode_steps, callback = None):
+def build_trainer(agent, env, env_params, num_envs, obs_size, max_episode_steps, callback = None):
+
+    vmap_env_reset = jax.vmap(env.reset, in_axes=(0, None))
+    vmap_env_step = jax.vmap(env.step, in_axes=(0, 0, 0, None))
+    
     def episode_body(t, carry):
         actor, critic, env_state, transition, history, key = carry
     
         sample_key, env_key, key = jax.random.split(key, 3)
-    
+
         action, action_prob = agent.sample_action(jnp.expand_dims(transition.obs, 0), actor, sample_key)
     
         action, action_prob = jnp.squeeze(action), jnp.squeeze(action_prob)
-    
-        obs, env_state, reward, done, _ = env.step(env_key, env_state, action, env_params)
+
+        vmap_env_key = jax.random.split(env_key, num_envs)
+        obs, env_state, reward, done, _ = vmap_env_step(vmap_env_key, env_state, action, env_params)
+        reward, action, done = jnp.expand_dims(reward, -1), jnp.expand_dims(action, -1), jnp.expand_dims(done, -1)
     
         next_transition = Transition(obs)
 
-        history = History(history.obs.at[t + 1, :].set(obs),
-                          history.reward.at[t, :].set(reward),
-                          history.action.at[t, :].set(action),
-                          history.done.at[t, :].set(done),
+        history = History(history.obs.at[:, t + 1, :].set(obs),
+                          history.reward.at[:, t, :].set(reward),
+                          history.action.at[:, t, :].set(action),
+                          history.done.at[:, t, :].set(done),
                           )
     
         return actor, critic, env_state, next_transition, history, key
@@ -42,15 +48,16 @@ def build_trainer(agent, env, env_params, obs_size, max_episode_steps, callback 
         actor, critic, all_rewards, key = carry
     
         reset_key, episode_key, key = jax.random.split(key, 3)
-    
-        obs, env_state = env.reset(reset_key, env_params)
+
+        vmap_reset_key = jax.random.split(reset_key, num_envs)
+        obs, env_state = vmap_env_reset(vmap_reset_key, env_params)
     
         transition = Transition(obs)
         
-        history = History(jnp.zeros((max_episode_steps + 1, obs_size)).at[0, :].set(obs),
-                          jnp.zeros((max_episode_steps, 1)),
-                          jnp.zeros((max_episode_steps, 1)),
-                          jnp.zeros((max_episode_steps, 1)),
+        history = History(jnp.zeros((num_envs, max_episode_steps + 1, obs_size)).at[:, 0, :].set(obs),
+                          jnp.zeros((num_envs, max_episode_steps, 1)),
+                          jnp.zeros((num_envs, max_episode_steps, 1)),
+                          jnp.zeros((num_envs, max_episode_steps, 1)),
                           )
     
         episode_carry = (actor, critic, env_state, transition, history, key)

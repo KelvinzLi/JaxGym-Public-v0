@@ -33,10 +33,14 @@ class ActorCriticDiscrete:
             action_logits = actor.apply_fn({'params': actor_params}, obs)
             pred_return = critic.apply_fn({'params': critic_params}, obs)
 
-            action_prob = jax.nn.softmax(action_logits, -1)[jnp.arange(action_id.shape[0]), action_id]
+            action_prob = jax.nn.softmax(action_logits, -1)
+            action_prob = jax.vmap(lambda x, id: x[jnp.arange(id.shape[0]), id],
+                                   in_axes = (0, 0))(
+                                       jax.nn.softmax(action_logits, -1), action_id
+                                       )
             action_prob = jnp.expand_dims(action_prob, -1)
 
-            advantage = self.advantage_estimator(pred_return, reward, done)
+            advantage = jax.vmap(self.advantage_estimator, in_axes = (0, 0, 0))(pred_return, reward, done)
 
             critic_loss = jnp.square(advantage).mean() / 2.0
 

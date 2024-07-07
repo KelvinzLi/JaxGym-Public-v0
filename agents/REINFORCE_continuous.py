@@ -35,11 +35,9 @@ class ActorCriticContinuous:
             action_mean, action_std = actor.apply_fn({'params': actor_params}, obs)
             pred_return = critic.apply_fn({'params': critic_params}, obs)
 
-            print(action_mean.shape, action_std.shape)
+            log_action_prob = jax.scipy.stats.norm.logpdf(action, action_mean[:, :-1], action_std[:, :-1])
 
-            log_action_prob = jax.scipy.stats.norm.logpdf(action, action_mean[:-1], action_std[:-1])
-
-            advantage = self.advantage_estimator(pred_return, reward, done)
+            advantage = jax.vmap(self.advantage_estimator, in_axes = (0, 0, 0))(pred_return, reward, done)
 
             critic_loss = jnp.square(advantage).mean() / 2.0
 
