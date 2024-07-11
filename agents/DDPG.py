@@ -14,15 +14,16 @@ def update_target_params(old_params, new_params, polyak_coef):
         return old_params * polyak_coef + new_params * (1 - polyak_coef)
 
 class DDPG:
-    def __init__(self, discount, polyak_coef, noise_scale):
+    def __init__(self, discount, polyak_coef, noise_scale, action_limits = (None, None)):
         self.discount = discount
         self.polyak_coef = polyak_coef
         self.noise_scale = noise_scale
+        self.action_limits = action_limits
 
     def sample_action(self, x, actor, key):
         action = actor.apply_fn({'params': actor.params}, x)
         noise = self.noise_scale * jax.random.normal(key, action.shape)
-        return jnp.clip(action + noise, -2, 2)
+        return jnp.clip(action + noise, self.action_limits[0], self.action_limits[1])
     
     def suggest_action(self, x, actor):
         return actor.apply_fn({'params': actor.params}, x)
@@ -41,8 +42,6 @@ class DDPG:
             pred_next_return = critic.apply_fn({'params': target_critic_params}, next_obs, pred_next_action)
 
             td_error = pred_og_return - (reward + self.discount * (1 - done) * pred_next_return)
-
-            print(pred_return.shape)
 
             critic_loss = jnp.square(td_error).mean()
 

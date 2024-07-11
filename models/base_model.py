@@ -3,6 +3,8 @@ import jax.numpy as jnp
 import flax
 from flax import linen as nn  # Linen API
 
+from typing import Tuple
+
 class BaseModel(nn.Module):
     hidden_size: int = 128
     num_layers: int = 1
@@ -31,3 +33,13 @@ class NormalDistPredictor(nn.Module):
         std = jnp.clip(std, 1e-10, 50)
 
         return mean, std
+
+class AffinedTanh(nn.Module):
+    limits: Tuple[float, float]
+    
+    @nn.compact
+    def __call__(self, x):
+        cm = (self.limits[0] + self.limits[1]) / 2
+        halved_diff = (self.limits[1] - self.limits[0]) / 2
+        
+        return cm + halved_diff * nn.tanh(x)

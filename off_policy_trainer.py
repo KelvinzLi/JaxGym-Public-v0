@@ -7,7 +7,7 @@ from flax import struct       # Flax dataclasses
 
 from structs import History, Transition
 
-def build_trainer(agent, sampler, env, env_params, num_envs, obs_size, max_episode_steps, callback = None):
+def build_trainer(agent, sampler, env, env_params, num_envs, obs_size, max_episode_steps, buffer_size_before_training, callback = None):
 
     vmap_env_reset = jax.vmap(env.reset, in_axes=(0, None))
     vmap_env_step = jax.vmap(env.step, in_axes=(0, 0, 0, None))
@@ -59,18 +59,14 @@ def build_trainer(agent, sampler, env, env_params, num_envs, obs_size, max_episo
 
         buffer = sampler.update_buffer(buffer, history)
 
-        print(buffer.obs.shape)
-        print(buffer.action.shape)
-        print(buffer.mask.shape)
-
         sample = sampler.sample_batch(buffer, sample_key)
 
-        func = jax.lax.cond(buffer.mask.sum() > 1000, 
-                            lambda: agent.train_one_step(actor, critic, target_actor_params, target_critic_params, sample.obs, sample.next_obs, sample.reward, sample.action, sample.done), 
-                            lambda: (actor, critic, target_actor_params, target_critic_params, 0.0, 0.0))
-
-        # actor, critic, target_actor_params, target_critic_params, loss, aux = agent.train_one_step(actor, critic, target_actor_params, target_critic_params, sample.obs, sample.next_obs, sample.reward, sample.action, sample.done)
-        actor, critic, target_actor_params, target_critic_params, loss, aux = func
+        training_output = jax.lax.cond(buffer.mask.sum() > buffer_size_before_training, 
+                                       lambda: agent.train_one_step(actor, critic, target_actor_params, target_critic_params, 
+                                                                    sample.obs, sample.next_obs, sample.reward, sample.action, sample.done), 
+                                       lambda: (actor, critic, target_actor_params, target_critic_params, 0.0, 0.0)
+                                      )
+        actor, critic, target_actor_params, target_critic_params, loss, aux = training_output
     
         all_rewards = all_rewards.at[ii, :].set(history.reward.sum() / (history.done).sum())
         # all_rewards = all_rewards.at[ii, :].set(aux)
