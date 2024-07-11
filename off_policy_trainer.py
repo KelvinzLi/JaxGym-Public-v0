@@ -7,7 +7,7 @@ from flax import struct       # Flax dataclasses
 
 from structs import History, Transition
 
-def build_trainer(agent, sampler, env, env_params, num_envs, obs_size, max_episode_steps, buffer_size_before_training, callback = None):
+def build_trainer(agent, sampler, env, env_params, num_envs, obs_size, action_size, max_episode_steps, buffer_size_before_training, callback = None):
 
     vmap_env_reset = jax.vmap(env.reset, in_axes=(0, None))
     vmap_env_step = jax.vmap(env.step, in_axes=(0, 0, 0, None))
@@ -36,7 +36,7 @@ def build_trainer(agent, sampler, env, env_params, num_envs, obs_size, max_episo
         return actor, critic, env_state, next_transition, history, key
     
     def fori_body(ii, carry):
-        actor, critic, target_actor_params, target_critic_params, buffer, all_rewards, key = carry
+        actor, critic, target_actor_params, target_critic_params, buffer, logger, key = carry
     
         reset_key, episode_key, sample_key, key = jax.random.split(key, 4)
 
@@ -47,7 +47,7 @@ def build_trainer(agent, sampler, env, env_params, num_envs, obs_size, max_episo
         
         history = History(jnp.zeros((num_envs, max_episode_steps, obs_size)),
                           jnp.zeros((num_envs, max_episode_steps, 1)),
-                          jnp.zeros((num_envs, max_episode_steps, 1)),
+                          jnp.zeros((num_envs, max_episode_steps, action_size)),
                           jnp.zeros((num_envs, max_episode_steps, 1)),
                           )
     
@@ -68,14 +68,14 @@ def build_trainer(agent, sampler, env, env_params, num_envs, obs_size, max_episo
                                       )
         actor, critic, target_actor_params, target_critic_params, loss, aux = training_output
     
-        all_rewards = all_rewards.at[ii, :].set(history.reward.sum() / (history.done).sum())
-        # all_rewards = all_rewards.at[ii, :].set(aux)
+        logger = logger.at[ii, :].set(history.reward.sum() / (history.done).sum())
+        # logger = logger.at[ii, :].set(aux)
 
         if callback is not None:
             info_dict = {"Reward": history.reward.sum() / (history.done.sum())}
             # info_dict = {"Reward": aux}
             jax.debug.callback(callback, info_dict)
     
-        return actor, critic, target_actor_params, target_critic_params, buffer, all_rewards, key
+        return actor, critic, target_actor_params, target_critic_params, buffer, logger, key
 
     return fori_body

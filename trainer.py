@@ -16,7 +16,7 @@ class History:
 class Transition:
     obs: jax.Array
 
-def build_trainer(agent, env, env_params, num_envs, obs_size, max_episode_steps, callback = None):
+def build_trainer(agent, env, env_params, num_envs, obs_size, action_size, max_episode_steps, callback = None):
 
     vmap_env_reset = jax.vmap(env.reset, in_axes=(0, None))
     vmap_env_step = jax.vmap(env.step, in_axes=(0, 0, 0, None))
@@ -45,7 +45,7 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, max_episode_steps,
         return actor, critic, env_state, next_transition, history, key
     
     def fori_body(ii, carry):
-        actor, critic, all_rewards, key = carry
+        actor, critic, logger, key = carry
     
         reset_key, episode_key, key = jax.random.split(key, 3)
 
@@ -56,7 +56,7 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, max_episode_steps,
         
         history = History(jnp.zeros((num_envs, max_episode_steps, obs_size)),
                           jnp.zeros((num_envs, max_episode_steps, 1)),
-                          jnp.zeros((num_envs, max_episode_steps, 1)),
+                          jnp.zeros((num_envs, max_episode_steps, action_size)),
                           jnp.zeros((num_envs, max_episode_steps, 1)),
                           )
     
@@ -68,13 +68,13 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, max_episode_steps,
 
         actor, critic, loss, aux = agent.train_one_step(actor, critic, history.obs, history.reward, history.action, history.done)
     
-        all_rewards = all_rewards.at[ii, :].set(history.reward.sum() / (history.done).sum())
-        # all_rewards = all_rewards.at[ii, :].set(aux)
+        logger = logger.at[ii, :].set(history.reward.sum() / (history.done).sum())
+        # logger = logger.at[ii, :].set(aux)
 
         if callback is not None:
             info_dict = {"Reward": history.reward.sum() / (history.done.sum())}
             jax.debug.callback(callback, info_dict)
     
-        return actor, critic, all_rewards, key
+        return actor, critic, logger, key
 
     return fori_body
