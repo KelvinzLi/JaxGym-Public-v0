@@ -33,18 +33,18 @@ class PPO(PolicyGradient):
                 threshold = jnp.where(old_advantage > 0, 1 + self.clip_ratio, 1 - self.clip_ratio)
                 ratio = jnp.exp(log_action_prob - old_log_action_prob) # action_prob / old_action_prob
 
-                surrogate_loss = -jnp.min(jnp.concat([ratio * old_advantage, threshold * old_advantage], axis = -1), axis = -1, keepdims = True)
+                surrogate_loss = -jnp.min(jnp.concatenate([ratio * old_advantage, threshold * old_advantage], axis = -1), axis = -1, keepdims = True)
 
                 actor_loss = surrogate_loss.mean()
 
-                return actor_loss + critic_loss, actor_loss
+                return actor_loss + critic_loss, advantage[:, -1].sum()
 
             actor, critic, cumulative_loss, cumulative_aux = carry
 
             grad_fn = jax.value_and_grad(loss_func, has_aux = True)
             (loss, aux), (actor_grads, critic_grads) = grad_fn((actor.params, critic.params))
 
-            aux = actor_grads['layers_0']['layers']['layers_0']['kernel'][0, 0]
+            # aux = actor_grads['layers_0']['layers']['layers_0']['kernel'][0, 0]
 
             actor = actor.apply_gradients(grads=actor_grads)
             critic = critic.apply_gradients(grads=critic_grads)

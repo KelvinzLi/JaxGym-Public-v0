@@ -16,7 +16,7 @@ class state_value_estimator:
     @partial(jit, static_argnums=(0,))
     def __call__(self, pred_returns, rewards, dones):
         _, expected_return = jax.lax.scan(self.scan_discounted_reward, 0, (rewards, dones), reverse = True)
-        advantage = expected_return - pred_returns[:-1] # observations and hence pred_returns records the final output observation (corresponding reward not recorded)
+        advantage = expected_return - pred_returns
 
         return advantage
 
@@ -28,19 +28,21 @@ class gae_estimator:
     @partial(jit, static_argnums=(0,))
     def __call__(self, pred_returns, rewards, dones):
         def scan_gae(carry, vars):
-            gae = carry
+            (gae, next_pred_return, flag) = carry
 
-            pred_return, next_pred_return, reward, done = vars
+            pred_return, reward, done = vars
 
-            td_error = reward + (1 - done) * self.discount * next_pred_return - pred_return
-            gae = td_error + (1 - done) * self.discount * self.gae_factor * gae
+            td_error = reward + (1 - done) * self.discount * jax.lax.stop_gradient(next_pred_return) - pred_return
+            gae = (td_error + (1 - done) * self.discount * self.gae_factor * gae) * flag
 
-            return jnp.squeeze(gae), gae
+            flag = 1 # flag = 0 only for the last element
+            
+            return (jnp.squeeze(gae), jnp.squeeze(pred_return), flag), gae
 
         _, advantages = jax.lax.scan(
             scan_gae, 
-            0, 
-            (pred_returns[:-1], jax.lax.stop_gradient(pred_returns[1:]), rewards, dones), 
+            (0, 0, 0), 
+            (pred_returns, rewards, dones), 
             reverse = True
         )
 

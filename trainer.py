@@ -36,7 +36,7 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, max_episode_steps,
     
         next_transition = Transition(obs)
 
-        history = History(history.obs.at[:, t + 1, :].set(obs),
+        history = History(history.obs.at[:, t, :].set(transition.obs),
                           history.reward.at[:, t, :].set(reward),
                           history.action.at[:, t, :].set(action),
                           history.done.at[:, t, :].set(done),
@@ -54,7 +54,7 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, max_episode_steps,
     
         transition = Transition(obs)
         
-        history = History(jnp.zeros((num_envs, max_episode_steps + 1, obs_size)).at[:, 0, :].set(obs),
+        history = History(jnp.zeros((num_envs, max_episode_steps, obs_size)),
                           jnp.zeros((num_envs, max_episode_steps, 1)),
                           jnp.zeros((num_envs, max_episode_steps, 1)),
                           jnp.zeros((num_envs, max_episode_steps, 1)),

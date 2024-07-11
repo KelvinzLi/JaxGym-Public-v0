@@ -42,7 +42,8 @@ class ActorCriticDiscrete(PolicyGradient):
 
     @partial(jit, static_argnums=(0,))
     def calculate_loss_components(self, actor, critic, actor_params, critic_params, obs, action_id):
-        action_id = jnp.astype(jnp.squeeze(action_id), jnp.int32)
+        # action_id = jnp.astype(jnp.squeeze(action_id), jnp.int32)
+        action_id = jnp.squeeze(action_id).astype(jnp.int32)
         
         action_logits = actor.apply_fn({'params': actor_params}, obs)
         pred_return = critic.apply_fn({'params': critic_params}, obs)
@@ -82,5 +83,5 @@ class ActorCriticContinuous(PolicyGradient):
         action_mean, action_std = actor.apply_fn({'params': actor_params}, obs)
         pred_return = critic.apply_fn({'params': critic_params}, obs)
 
-        log_action_prob = jax.scipy.stats.norm.logpdf(action, action_mean[:, :-1], action_std[:, :-1])
+        log_action_prob = jax.scipy.stats.norm.logpdf(action, action_mean, action_std)
         return pred_return, log_action_prob
