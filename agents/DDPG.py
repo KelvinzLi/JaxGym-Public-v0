@@ -29,7 +29,8 @@ class DDPG:
         return actor.apply_fn({'params': actor.params}, x)
 
     @partial(jit, static_argnums=(0,))
-    def train_one_step(self, actor, critic, target_actor_params, target_critic_params, obs, next_obs, reward, action, done):
+    def train_one_step(self, actor, critic, target_actor_params, target_critic_params, obs, next_obs, reward, action, done, 
+                       *args, **kwargs):
 
         def loss_func(params):
             actor_params, critic_params = params
