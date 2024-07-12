@@ -43,26 +43,31 @@ class TD3:
         def loss_func(params):
             actor_params, critic_params_1, critic_params_2 = params
 
-            pred_action = actor.apply_fn({'params': actor_params}, obs)
-            
-            pred_next_action = actor.apply_fn({'params': target_actor_params}, next_obs)
-            target_noise = jnp.clip(self.target_noise_scale * jax.random.normal(key, action.shape), -self.noise_clip, self.noise_clip)
-            pred_next_action = jnp.clip(pred_next_action + target_noise, self.action_limits[0], self.action_limits[1])
+            ########## Critic (Q-function) loss calculation
 
             pred_og_return_1 = critic_1.apply_fn({'params': critic_params_1}, obs, action)
             pred_og_return_2 = critic_2.apply_fn({'params': critic_params_2}, obs, action)
             
-            pred_return = critic_1.apply_fn({'params': jax.lax.stop_gradient(critic_params_1)}, obs, pred_action)
+            pred_next_action = actor.apply_fn({'params': target_actor_params}, next_obs)
+            target_noise = jnp.clip(self.target_noise_scale * jax.random.normal(key, action.shape), -self.noise_clip, self.noise_clip)
+            pred_next_action = jnp.clip(pred_next_action + target_noise, self.action_limits[0], self.action_limits[1])
             
             pred_next_return_1 = critic_1.apply_fn({'params': target_critic_params_1}, next_obs, pred_next_action)
             pred_next_return_2 = critic_2.apply_fn({'params': target_critic_params_2}, next_obs, pred_next_action)
             pred_next_return = jnp.where(pred_next_return_1 < pred_next_return_2, pred_next_return_1, pred_next_return_2)
 
-            td_error_1 = pred_og_return_1 - (reward + self.discount * (1 - done) * pred_next_return_1)
-            td_error_2 = pred_og_return_2 - (reward + self.discount * (1 - done) * pred_next_return_2)
+            target_q = reward + self.discount * (1 - done) * pred_next_return
+
+            td_error_1 = pred_og_return_1 - target_q
+            td_error_2 = pred_og_return_2 - target_q
 
             critic_loss_1 = jnp.square(td_error_1).mean()
             critic_loss_2 = jnp.square(td_error_2).mean()
+
+            ########## Actor (policy) loss calculation
+
+            pred_action = actor.apply_fn({'params': actor_params}, obs)
+            pred_return = critic_1.apply_fn({'params': jax.lax.stop_gradient(critic_params_1)}, obs, pred_action)
 
             actor_loss = -(pred_return).mean()
 

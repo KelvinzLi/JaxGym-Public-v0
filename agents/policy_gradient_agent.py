@@ -69,7 +69,7 @@ class ActorCriticContinuous(PolicyGradient):
 
         z = jax.random.normal(key)
         action = mean + z * std
-        action_prob = normal_pdf(z, 0, 1)
+        action_prob = normal_pdf(action, mean, std)
 
         return action, action_prob
 
