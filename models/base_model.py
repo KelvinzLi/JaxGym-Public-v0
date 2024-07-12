@@ -23,10 +23,17 @@ class BaseModel(nn.Module):
 class NormalDistPredictor(nn.Module):
     output_size: int
     logvar_init_value: float = 0
+    limits: Tuple[float, float] = None
 
     @nn.compact
     def __call__(self, x):
         mean = nn.Dense(features = self.output_size)(x)
+
+        if self.limits is not None:
+            cm = (self.limits[0] + self.limits[1]) / 2
+            halved_diff = (self.limits[1] - self.limits[0]) / 2
+            
+            mean = cm + halved_diff * nn.tanh(mean)
 
         logvar_param = self.param('logvar_param', lambda rng, shape: self.logvar_init_value * jnp.ones(shape), (1,))
         std = jnp.exp(logvar_param / 2) * jnp.ones_like(mean)
