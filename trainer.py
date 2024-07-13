@@ -26,15 +26,15 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, action_size, max_e
     
         sample_key, env_key, key = jax.random.split(key, 3)
 
-        action, action_prob = agent.sample_action(jnp.expand_dims(transition.obs, 0), actor, sample_key)
-    
-        action, action_prob = jnp.squeeze(action), jnp.squeeze(action_prob)
+        action, action_prob = agent.sample_action(transition.obs, actor, sample_key)
 
         vmap_env_key = jax.random.split(env_key, num_envs)
         obs, env_state, reward, done, _ = vmap_env_step(vmap_env_key, env_state, action, env_params)
-        reward, action, done = jnp.expand_dims(reward, -1), jnp.expand_dims(action, -1), jnp.expand_dims(done, -1)
+        reward, action, done = jnp.reshape(reward, (num_envs, 1)), jnp.reshape(action, (num_envs, action_size)), jnp.reshape(done, (num_envs, 1))
     
         next_transition = Transition(obs)
+
+        print(action.shape)
 
         history = History(history.obs.at[:, t, :].set(transition.obs),
                           history.reward.at[:, t, :].set(reward),
