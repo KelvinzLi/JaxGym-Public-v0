@@ -16,7 +16,7 @@ def update_target_params(old_params, new_params, polyak_coef):
         return old_params * polyak_coef + new_params * (1 - polyak_coef)
 
 def normal_pdf(x, mean, std):
-    return jnp.exp(-jnp.square((x - mean) / std) / 2) / jnp.sqrt(2 * jnp.pi) / std
+    return jnp.exp(-jnp.square((x - mean) / (std + 1e-10)) / 2) / jnp.sqrt(2 * jnp.pi) / (std + 1e-10)
 
 class SAC:
     def __init__(self, discount, polyak_coef, entropy_alpha, action_limits = (None, None)):
@@ -72,7 +72,7 @@ class SAC:
             pred_next_return_2 = critic_2.apply_fn({'params': target_critic_params_2}, next_obs, pred_next_action)
             pred_next_return = jnp.where(pred_next_return_1 < pred_next_return_2, pred_next_return_1, pred_next_return_2)
 
-            next_entropy = -jnp.log(pred_next_action_prob)
+            next_entropy = -jnp.log(pred_next_action_prob + 1e-10)
 
             target_q = reward + self.discount * (1 - done) * (pred_next_return + self.entropy_alpha * next_entropy)
 
@@ -93,7 +93,7 @@ class SAC:
             pred_return_2 = critic_2.apply_fn({'params': jax.lax.stop_gradient(critic_params_2)}, obs, pred_action)
             pred_return = jnp.where(pred_return_1 < pred_return_2, pred_return_1, pred_return_2)
 
-            entropy = -jnp.log(pred_action_prob)
+            entropy = -jnp.log(pred_action_prob + 1e-10)
 
             actor_loss = -(pred_return + self.entropy_alpha * entropy).mean()
 
