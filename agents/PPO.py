@@ -55,8 +55,6 @@ class PPO(PolicyGradient):
             carry = (actor, critic, cumulative_loss + loss, cumulative_aux + aux, approx_kl, t + 1)
 
             return carry
-
-        print("Using while loop")
         
         carry = (actor, critic, 0, 0, 0, 0)
         carry = jax.lax.while_loop(lambda carry: jnp.greater(self.ppo_steps, carry[-1]) & jnp.greater(1.5 * self.target_kl, carry[-2]), 
