@@ -8,16 +8,18 @@ from agents.policy_gradient_agent import PolicyGradient, ActorCriticDiscrete, Ac
 
 class PPO(PolicyGradient):
 
-    def __init__(self, advantage_estimator, clip_ratio, ppo_steps, target_kl = 0.01):
+    def __init__(self, advantage_estimator, clip_ratio, ppo_steps, target_kl = 0.01, entropy_coef = 0):
         super().__init__(advantage_estimator)
         self.clip_ratio = clip_ratio
         self.ppo_steps = ppo_steps
         self.target_kl = target_kl
+
+        self.entropy_coef = entropy_coef
     
     @partial(jit, static_argnums=(0,))
     def train_one_step(self, actor, critic, obs, reward, action, done):
 
-        old_pred_return, old_log_action_prob = self.calculate_loss_components(actor, critic, actor.params, critic.params, obs, action)
+        old_pred_return, old_log_action_prob = self.calculate_loss_components(actor, critic, actor.params, critic.params, obs, action, done = done)
 
         old_advantage = jax.vmap(self.advantage_estimator, in_axes = (0, 0, 0))(old_pred_return, reward, done)
 
@@ -25,7 +27,7 @@ class PPO(PolicyGradient):
             def loss_func(params):
                 actor_params, critic_params = params
 
-                pred_return, log_action_prob = self.calculate_loss_components(actor, critic, actor_params, critic_params, obs, action)
+                pred_return, log_action_prob = self.calculate_loss_components(actor, critic, actor_params, critic_params, obs, action, done = done)
 
                 advantage = jax.vmap(self.advantage_estimator, in_axes = (0, 0, 0))(pred_return, reward, done)
 
@@ -36,7 +38,9 @@ class PPO(PolicyGradient):
 
                 surrogate_loss = -jnp.min(jnp.concatenate([ratio * old_advantage, threshold * old_advantage], axis = -1), axis = -1, keepdims = True)
 
-                actor_loss = surrogate_loss.mean()
+                entropy = -log_action_prob.mean()
+
+                actor_loss = surrogate_loss.mean() - self.entropy_coef * entropy
 
                 approx_kl = (old_log_action_prob - log_action_prob).mean()
 

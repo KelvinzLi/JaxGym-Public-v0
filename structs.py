@@ -2,6 +2,8 @@ from flax import struct       # Flax dataclasses
 
 import jax
 
+from typing import Any
+
 ################################## for trainer
 
 @struct.dataclass
@@ -14,6 +16,8 @@ class History:
 @struct.dataclass
 class Transition:
     obs: jax.Array
+    done: jax.Array = None
+    carry: Any = None
 
 ################################## for sampler
 

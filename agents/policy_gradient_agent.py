@@ -16,11 +16,11 @@ class PolicyGradient:
         raise NotImplementedError()
 
     @partial(jit, static_argnums=(0,))
-    def calculate_loss_components(self, actor, critic, actor_params, critic_params, obs, action_id):
+    def calculate_loss_components(self, actor, critic, actor_params, critic_params, obs, action):
         raise NotImplementedError()
 
     @partial(jit, static_argnums=(0,))
-    def train_one_step(self, actor, critic, obs, reward, action, done):
+    def train_one_step(self, actor, critic, obs, reward, action, done, *args, **kwargs):
         raise NotImplementedError()
 
 
@@ -41,7 +41,7 @@ class ActorCriticDiscrete(PolicyGradient):
         return action_id
 
     @partial(jit, static_argnums=(0,))
-    def calculate_loss_components(self, actor, critic, actor_params, critic_params, obs, action_id):
+    def calculate_loss_components(self, actor, critic, actor_params, critic_params, obs, action_id, **kwargs):
         # action_id = jnp.astype(jnp.squeeze(action_id), jnp.int32)
         action_id = jnp.squeeze(action_id).astype(jnp.int32)
         
@@ -79,7 +79,7 @@ class ActorCriticContinuous(PolicyGradient):
         return mean
 
     @partial(jit, static_argnums=(0,))
-    def calculate_loss_components(self, actor, critic, actor_params, critic_params, obs, action):
+    def calculate_loss_components(self, actor, critic, actor_params, critic_params, obs, action, **kwargs):
         action_mean, action_std = actor.apply_fn({'params': actor_params}, obs)
         pred_return = critic.apply_fn({'params': critic_params}, obs)
 
