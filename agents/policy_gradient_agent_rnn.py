@@ -31,10 +31,10 @@ class ActorCriticRNNDiscrete(PolicyGradient):
         _, action_logits = actor.apply_fn({'params': actor_params}, obs, done)
         _, pred_return = critic.apply_fn({'params': critic_params}, obs, done)
 
-        action_prob = jax.nn.softmax(action_logits, -1)
+        action_probs = jax.nn.softmax(action_logits, -1)
         action_prob = jax.vmap(lambda x, id: x[jnp.arange(id.shape[0]), id],
                                in_axes = (0, 0))(
-                                   jax.nn.softmax(action_logits, -1), action_id
+                                   action_probs, action_id
                                    )
         action_prob = jnp.expand_dims(action_prob, -1)
 

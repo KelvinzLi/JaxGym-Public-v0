@@ -14,7 +14,12 @@ class PPO(PolicyGradient):
         self.ppo_steps = ppo_steps
         self.target_kl = target_kl
 
-        self.entropy_coef = entropy_coef
+        # self.entropy_coef = entropy_coef
+
+        if type(entropy_coef) in (int, float):
+            self.entropy_scheduler = lambda: entropy_coef
+        else:
+            self.entropy_scheduler = entropy_coef
     
     @partial(jit, static_argnums=(0,))
     def train_one_step(self, actor, critic, obs, reward, action, done):
@@ -40,11 +45,13 @@ class PPO(PolicyGradient):
 
                 entropy = -log_action_prob.mean()
 
-                actor_loss = surrogate_loss.mean() - self.entropy_coef * entropy
+                actor_loss = surrogate_loss.mean() - self.entropy_scheduler() * entropy
 
-                approx_kl = (old_log_action_prob - log_action_prob).mean()
+                log_r = log_action_prob - old_log_action_prob
+                approx_kl = (jnp.exp(log_r) - 1 - log_r).mean()
+                # approx_kl = (old_log_action_prob - log_action_prob).mean()
 
-                return actor_loss + critic_loss, (approx_kl, actor_loss)
+                return actor_loss + critic_loss, (approx_kl, entropy)
 
             actor, critic, cumulative_loss, cumulative_aux, _, t = carry
 
@@ -52,6 +59,7 @@ class PPO(PolicyGradient):
             (loss, (approx_kl, aux)), (actor_grads, critic_grads) = grad_fn((actor.params, critic.params))
 
             # aux = actor_grads['layers_0']['layers']['layers_0']['kernel'][0, 0]
+            # aux = approx_kl
 
             actor = actor.apply_gradients(grads=actor_grads)
             critic = critic.apply_gradients(grads=critic_grads)
@@ -65,7 +73,14 @@ class PPO(PolicyGradient):
                                    ppo_update_step, 
                                    carry,
                                   )
-        actor, critic, loss, aux, _, _ = carry
+        actor, critic, cumulative_loss, cumulative_aux, approx_kl, t = carry
+
+        aux = cumulative_aux / t
+        loss = cumulative_loss / t
+
+        train_log = {"loss": loss, "entropy": aux, "kl": approx_kl, "ppo_steps": t}
+
+        # aux = carry[-2]
 
         return actor, critic, loss, aux
 

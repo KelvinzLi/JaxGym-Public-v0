@@ -84,7 +84,7 @@ class GridWorld(environment.Environment[GridWorldState, GridWorldParams]):
 
     @partial(jit, static_argnums=(0,))
     def get_reward_done(self, state, params):
-        reward, done = jax.lax.cond(jnp.array_equal(state.pos[0], state.target[0]) & jnp.array_equal(state.pos[1], state.target[1]),
+        reward, done = jax.lax.cond(jnp.array_equal(state.pos, state.target),
                                     lambda: (self.END_REWARD, True),
                                     lambda: (self.STEP_REWARD, False))
 

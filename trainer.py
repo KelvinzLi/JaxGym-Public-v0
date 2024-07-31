@@ -7,7 +7,10 @@ from flax import struct       # Flax dataclasses
 
 from structs import History, Transition
 
-def build_trainer(agent, env, env_params, num_envs, obs_size, action_size, max_episode_steps, callback = None, 
+
+
+def build_trainer(agent, env, env_params, num_envs, obs_size, action_size, max_episode_steps, 
+                  callback = None, #logger = default_logger,
                   use_rnn_agent = False, rnn_carry_initializer = None):
 
     vmap_env_reset = jax.vmap(env.reset, in_axes=(0, None))
@@ -59,13 +62,13 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, action_size, max_e
                                             carry = rnn_carry_initializer(reset_key), # random carry shape to initiate the process
                                            )
         
-        history = History(jnp.zeros((num_envs, max_episode_steps, obs_size)),
+        history = History(jnp.zeros((num_envs, max_episode_steps, *obs_size)),
                           jnp.zeros((num_envs, max_episode_steps, 1)),
                           jnp.zeros((num_envs, max_episode_steps, action_size)),
                           jnp.zeros((num_envs, max_episode_steps, 1)),
                           )
     
-        episode_carry = (actor, critic, env_state, transition, history, key)
+        episode_carry = (actor, critic, env_state, transition, history, episode_key)
 
         episode_carry = jax.lax.fori_loop(0, max_episode_steps, episode_body, episode_carry)
     
@@ -78,7 +81,7 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, action_size, max_e
 
         if callback is not None:
             jit_unique = jax.jit(jnp.unique, static_argnames=['size'])
-            info_dict = {"Reward": history.reward.sum() / history.done.sum(), "Total reward": history.reward.sum(), "actions": jit_unique(history.action, size=4, fill_value=-1)}
+            info_dict = {"Reward": history.reward.sum() / history.done.sum(), "Total reward": history.reward.sum(), "actions": jit_unique(history.action, size=4, fill_value=-1), "aux": aux}
             jax.debug.callback(callback, info_dict)
     
         return actor, critic, logger, key

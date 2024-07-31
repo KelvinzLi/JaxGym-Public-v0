@@ -64,7 +64,7 @@ def build_trainer(agent, sampler, env, env_params, num_envs, obs_size, action_si
     
         transition = Transition(obs)
         
-        history = History(jnp.zeros((num_envs, max_episode_steps, obs_size)),
+        history = History(jnp.zeros((num_envs, max_episode_steps, *obs_size)),
                           jnp.zeros((num_envs, max_episode_steps, 1)),
                           jnp.zeros((num_envs, max_episode_steps, action_size)),
                           jnp.zeros((num_envs, max_episode_steps, 1)),

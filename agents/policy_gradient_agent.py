@@ -32,6 +32,8 @@ class ActorCriticDiscrete(PolicyGradient):
         action_id = jax.random.categorical(key, pred_logits, -1)
         action_prob = jax.nn.softmax(pred_logits, -1)[jnp.arange(action_id.shape[0]), action_id]
 
+        action_id = jnp.expand_dims(action_id, -1)
+
         return action_id, action_prob
 
     def suggest_action(self, x, actor):
