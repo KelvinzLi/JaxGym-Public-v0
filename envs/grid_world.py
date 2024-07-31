@@ -28,8 +28,6 @@ class GridWorldParams(environment.EnvParams):
     max_steps_in_episode: int = 200
 
 class GridWorld(environment.Environment[GridWorldState, GridWorldParams]):
-    STEP_REWARD = -0.1
-    END_REWARD = 1.0
     VOID = 0
     WALL = 1
 
@@ -85,8 +83,8 @@ class GridWorld(environment.Environment[GridWorldState, GridWorldParams]):
     @partial(jit, static_argnums=(0,))
     def get_reward_done(self, state, params):
         reward, done = jax.lax.cond(jnp.array_equal(state.pos, state.target),
-                                    lambda: (self.END_REWARD, True),
-                                    lambda: (self.STEP_REWARD, False))
+                                    lambda: (1 - 0.9 * state.time / params.max_steps_in_episode, True),
+                                    lambda: (0.0, False))
 
         done = jax.lax.cond(state.time == params.max_steps_in_episode, 
                             lambda: True, 
@@ -149,8 +147,13 @@ class GridWorld(environment.Environment[GridWorldState, GridWorldParams]):
             self.WALL, self.VOID
         )
 
+        target_key1, target_key2 = jax.random.split(key, 2)
         pos = jax.random.randint(pos_key, (2,), 0, jnp.array(self.grid_size))
-        target = jax.random.randint(target_key, (2,), 0, jnp.array(self.grid_size))
+        # target = jax.random.randint(target_key, (2,), 0, jnp.array(self.grid_size))
+        target = jnp.array([
+            jax.random.choice(target_key1, a = jnp.arange(self.grid_size[0]), p = jnp.ones((self.grid_size[0],)).at[pos[0]].set(0)),
+            jax.random.choice(target_key2, a = jnp.arange(self.grid_size[1]), p = jnp.ones((self.grid_size[1],)).at[pos[1]].set(0)),
+        ])
         
         map = map.at[pos[0], pos[1]].set(self.VOID)
         map = map.at[target[0], target[1]].set(self.VOID)
