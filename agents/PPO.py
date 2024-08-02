@@ -14,8 +14,6 @@ class PPO(PolicyGradient):
         self.ppo_steps = ppo_steps
         self.target_kl = target_kl
 
-        # self.entropy_coef = entropy_coef
-
         if type(entropy_coef) in (int, float):
             self.entropy_scheduler = lambda: entropy_coef
         else:
@@ -51,38 +49,58 @@ class PPO(PolicyGradient):
                 approx_kl = (jnp.exp(log_r) - 1 - log_r).mean()
                 # approx_kl = (old_log_action_prob - log_action_prob).mean()
 
-                return actor_loss + critic_loss, (approx_kl, entropy)
+                return actor_loss + critic_loss, (actor_loss, critic_loss, approx_kl, entropy)
 
-            actor, critic, cumulative_loss, cumulative_aux, _, t = carry
+            actor, critic, metrics, t = carry
+            cumulative_loss, cumulative_actor_loss, cumulative_critic_loss, approx_kl, cumulative_entropy = metrics
 
             grad_fn = jax.value_and_grad(loss_func, has_aux = True)
-            (loss, (approx_kl, aux)), (actor_grads, critic_grads) = grad_fn((actor.params, critic.params))
-
-            # aux = actor_grads['layers_0']['layers']['layers_0']['kernel'][0, 0]
-            # aux = approx_kl
+            (loss, aux), (actor_grads, critic_grads) = grad_fn((actor.params, critic.params))
 
             actor = actor.apply_gradients(grads=actor_grads)
             critic = critic.apply_gradients(grads=critic_grads)
 
-            carry = (actor, critic, cumulative_loss + loss, cumulative_aux + aux, approx_kl, t + 1)
+            actor_loss, critic_loss, approx_kl, entropy = aux
+
+            # aux = actor_grads['layers_0']['layers']['layers_0']['kernel'][0, 0]
+            # aux = approx_kl
+
+            metrics = (
+                cumulative_loss + loss, 
+                cumulative_actor_loss + actor_loss, 
+                cumulative_critic_loss + critic_loss, 
+                approx_kl,
+                cumulative_entropy + entropy,
+            )
+
+            carry = (actor, critic, metrics, t + 1)
 
             return carry
-        
-        carry = (actor, critic, 0, 0, 0, 0)
-        carry = jax.lax.while_loop(lambda carry: jnp.greater(self.ppo_steps, carry[-1]) & jnp.greater(1.5 * self.target_kl, carry[-2]), 
+
+        metrics = (0, 0, 0, 0, 0)
+        carry = (actor, critic, metrics, 0)
+        carry = jax.lax.while_loop(lambda carry: jnp.greater(self.ppo_steps, carry[-1]) & jnp.greater(1.5 * self.target_kl, carry[-2][-2]), 
                                    ppo_update_step, 
                                    carry,
                                   )
-        actor, critic, cumulative_loss, cumulative_aux, approx_kl, t = carry
+        actor, critic, metrics, t = carry
 
-        aux = cumulative_aux / t
+        cumulative_loss, cumulative_actor_loss, cumulative_critic_loss, approx_kl, cumulative_entropy = metrics
+
         loss = cumulative_loss / t
+        actor_loss = cumulative_actor_loss / t
+        critic_loss = cumulative_critic_loss / t
+        entropy = cumulative_entropy / t
 
-        train_log = {"loss": loss, "entropy": aux, "kl": approx_kl, "ppo_steps": t}
-
-        # aux = carry[-2]
-
-        return actor, critic, loss, aux
+        train_log = {"loss": loss.squeeze(), 
+                     "actor_loss": actor_loss.squeeze(), 
+                     "critic_loss": critic_loss.squeeze(), 
+                     "kl": approx_kl.squeeze(), 
+                     "entropy": entropy.squeeze(), 
+                     "ppo_steps": t
+                    }
+        
+        return actor, critic, train_log
 
 class PPODiscrete(PPO, ActorCriticDiscrete):
     pass

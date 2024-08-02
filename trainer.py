@@ -10,7 +10,7 @@ from structs import History, Transition
 
 
 def build_trainer(agent, env, env_params, num_envs, obs_size, action_size, max_episode_steps, 
-                  callback = None, #logger = default_logger,
+                  callback = None, 
                   use_rnn_agent = False, rnn_carry_initializer = None):
 
     vmap_env_reset = jax.vmap(env.reset, in_axes=(0, None))
@@ -46,7 +46,7 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, action_size, max_e
         return actor, critic, env_state, next_transition, history, key
     
     def fori_body(ii, carry):
-        actor, critic, logger, key = carry
+        actor, critic, key = carry
     
         reset_key, episode_key, key = jax.random.split(key, 3)
 
@@ -74,16 +74,21 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, action_size, max_e
     
         history = episode_carry[4]
 
-        actor, critic, loss, aux = agent.train_one_step(actor, critic, history.obs, history.reward, history.action, history.done)
-    
-        logger = logger.at[ii, :].set(history.reward.sum() / (history.done).sum())
-        # logger = logger.at[ii, :].set(aux)
+        actor, critic, train_log = agent.train_one_step(actor, critic, history.obs, history.reward, history.action, history.done)
 
         if callback is not None:
-            jit_unique = jax.jit(jnp.unique, static_argnames=['size'])
-            info_dict = {"Reward": history.reward.sum() / history.done.sum(), "Total reward": history.reward.sum(), "actions": jit_unique(history.action, size=4, fill_value=-1), "aux": aux}
+            rollout_dict = {}
+
+            rollout_dict["episode_reward"] = (history.reward.sum() / history.done.sum()).squeeze()
+            rollout_dict["total_reward"] = history.reward.sum().squeeze()
+
+            info_dict = rollout_dict | train_log
+
+            # jit_unique = jax.jit(jnp.unique, static_argnames=['size'])
+            # "actions": jit_unique(history.action, size=4, fill_value=-1)
+
             jax.debug.callback(callback, info_dict)
     
-        return actor, critic, logger, key
+        return actor, critic, key
 
     return fori_body
