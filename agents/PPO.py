@@ -20,7 +20,7 @@ class PPO(PolicyGradient):
             self.entropy_scheduler = entropy_coef
     
     @partial(jit, static_argnums=(0,))
-    def train_one_step(self, actor, critic, obs, reward, action, done):
+    def train_one_step(self, actor, critic, obs, reward, action, done, update_stamp):
 
         old_pred_return, old_log_action_prob = self.calculate_loss_components(actor, critic, actor.params, critic.params, obs, action, done = done)
 
@@ -55,12 +55,12 @@ class PPO(PolicyGradient):
             cumulative_loss, cumulative_actor_loss, cumulative_critic_loss, approx_kl, cumulative_entropy = metrics
 
             grad_fn = jax.value_and_grad(loss_func, has_aux = True)
-            (loss, aux), (actor_grads, critic_grads) = grad_fn((actor.params, critic.params))
+            (loss, aux_metrics), (actor_grads, critic_grads) = grad_fn((actor.params, critic.params))
 
             actor = actor.apply_gradients(grads=actor_grads)
             critic = critic.apply_gradients(grads=critic_grads)
 
-            actor_loss, critic_loss, approx_kl, entropy = aux
+            actor_loss, critic_loss, approx_kl, entropy = aux_metrics
 
             # aux = actor_grads['layers_0']['layers']['layers_0']['kernel'][0, 0]
             # aux = approx_kl

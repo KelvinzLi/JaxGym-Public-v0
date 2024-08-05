@@ -74,7 +74,7 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, action_size, max_e
     
         history = episode_carry[4]
 
-        actor, critic, train_log = agent.train_one_step(actor, critic, history.obs, history.reward, history.action, history.done)
+        actor, critic, train_log = agent.train_one_step(actor, critic, history.obs, history.reward, history.action, history.done, update_stamp = ii)
 
         if callback is not None:
             rollout_dict = {}

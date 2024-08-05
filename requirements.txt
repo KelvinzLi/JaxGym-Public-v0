@@ -3,3 +3,4 @@ gym[classic_control]
 brax==0.10.4
 imageio
 gymnasium[mujoco]
+pygame
