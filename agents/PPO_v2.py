@@ -8,8 +8,11 @@ from agents.policy_gradient_agent import PolicyGradient, ActorCriticDiscrete, Ac
 
 class PPO(PolicyGradient):
 
-    def __init__(self, advantage_estimator, clip_ratio, ppo_steps, target_kl = 0.01, entropy_coef = 0):
+    def __init__(self, advantage_estimator, return_estimator, clip_ratio, ppo_steps, target_kl = 0.01, entropy_coef = 0):
         super().__init__(advantage_estimator)
+
+        self.return_estimator = return_estimator
+        
         self.clip_ratio = clip_ratio
         self.ppo_steps = ppo_steps
         self.target_kl = target_kl
@@ -34,9 +37,10 @@ class PPO(PolicyGradient):
 
                 pred_return, log_action_prob = self.calculate_loss_components(actor, critic, actor_params, critic_params, obs, action, done = done)
 
-                advantage = jax.vmap(self.advantage_estimator, in_axes = (0, 0, 0))(pred_return, reward, done)
+                expected_return = jax.vmap(self.return_estimator, in_axes = (0, 0, 0))(pred_return, reward, done)
+                expected_return = jax.lax.stop_gradient(expected_return)
 
-                critic_loss = jnp.square(advantage).mean() / 2.0
+                critic_loss = jnp.square(pred_return - expected_return).mean() / 2.0
 
                 threshold = jnp.where(old_advantage > 0, 1 + self.clip_ratio, 1 - self.clip_ratio)
                 ratio = jnp.exp(log_action_prob - old_log_action_prob) # action_prob / old_action_prob

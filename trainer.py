@@ -26,7 +26,8 @@ def build_trainer(agent, env, env_params, num_envs, obs_size, action_size, max_e
         else:
             carry, (action, action_prob) = agent.sample_action(jnp.expand_dims(transition.obs, axis = 1), transition.carry, jnp.expand_dims(transition.done, axis = 1), actor, sample_key)
 
-        action = jnp.squeeze(action, axis = -1) # otherwise gives error when action size is 1
+        if action.shape[-1] == 1:
+            action = jnp.squeeze(action, axis = -1) # otherwise gives error when action size is 1
         
         vmap_env_key = jax.random.split(env_key, num_envs)
         obs, env_state, reward, done, _ = vmap_env_step(vmap_env_key, env_state, action, env_params)

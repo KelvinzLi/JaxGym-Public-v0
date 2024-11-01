@@ -20,6 +20,21 @@ class state_value_estimator:
 
         return advantage
 
+class expected_return_estimator:
+    def __init__(self, discount):
+        self.discount = discount
+
+    def scan_discounted_reward(self, carry, x):
+        reward, done = x
+        v = reward + (1 - done) * self.discount * carry
+        return jnp.squeeze(v), v
+
+    @partial(jit, static_argnums=(0,))
+    def __call__(self, pred_returns, rewards, dones):
+        rewards = rewards.at[-1].set(jnp.where(dones[-1], rewards[-1], pred_returns[-1]))
+        _, expected_return = jax.lax.scan(self.scan_discounted_reward, 0, (rewards, dones), reverse = True)
+        return expected_return
+
 class gae_estimator:
     def __init__(self, discount, gae_factor):
         self.discount = discount
