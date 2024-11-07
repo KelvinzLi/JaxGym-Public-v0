@@ -1,0 +1,31 @@
+wandb_project_name = "PPO_Hopper_run"
+
+train_python_file = "train_scripts.brax.hopper.train_ppo_hopper"
+
+[const]
+
+discount = 0.99
+
+actor_lr = 5e-4
+critic_lr = 5e-4
+
+clip_ratio = 0.2
+
+ppo_steps = 4
+
+update_iters = 100_000
+
+train_rollout_steps = 20
+eval_rollout_steps = 1000
+eval_every = 400
+
+num_envs = 512
+
+hidden_size = 128
+num_layers = 2
+
+gae_factor = 0.95
+
+[var]
+
+env_name = ['halfcheetah'] # ['ant', 'halfcheetah', 'hopper']

@@ -13,7 +13,7 @@ class BaseModel(nn.Module):
         layers = []
         for ii in range(self.num_layers):
             layers.append(nn.Dense(self.hidden_size))
-            layers.append(nn.relu)
+            layers.append(nn.tanh)
 
         self.layers = nn.Sequential(layers)
 

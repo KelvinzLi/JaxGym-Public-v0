@@ -29,6 +29,8 @@ class PPO(PolicyGradient):
 
         old_advantage = jax.vmap(self.advantage_estimator, in_axes = (0, 0, 0))(old_pred_return, reward, done)
 
+        expected_return = old_pred_return + old_advantage
+
         old_advantage = (old_advantage - old_advantage.mean()) / old_advantage.std()
 
         def ppo_update_step(carry):
@@ -37,15 +39,20 @@ class PPO(PolicyGradient):
 
                 pred_return, log_action_prob = self.calculate_loss_components(actor, critic, actor_params, critic_params, obs, action, done = done)
 
-                expected_return = jax.vmap(self.return_estimator, in_axes = (0, 0, 0))(pred_return, reward, done)
-                expected_return = jax.lax.stop_gradient(expected_return)
+                # expected_return = jax.vmap(self.return_estimator, in_axes = (0, 0, 0))(pred_return, reward, done)
+                # expected_return = jax.lax.stop_gradient(expected_return)
 
                 critic_loss = jnp.square(pred_return - expected_return).mean() / 2.0
 
-                threshold = jnp.where(old_advantage > 0, 1 + self.clip_ratio, 1 - self.clip_ratio)
-                ratio = jnp.exp(log_action_prob - old_log_action_prob) # action_prob / old_action_prob
+                # threshold = jnp.where(old_advantage > 0, 1 + self.clip_ratio, 1 - self.clip_ratio)
+                # ratio = jnp.exp(log_action_prob - old_log_action_prob) # action_prob / old_action_prob
 
-                surrogate_loss = -jnp.min(jnp.concatenate([ratio * old_advantage, threshold * old_advantage], axis = -1), axis = -1, keepdims = True)
+                # surrogate_loss = -jnp.min(jnp.concatenate([ratio * old_advantage, threshold * old_advantage], axis = -1), axis = -1, keepdims = True)
+
+                ratio = jnp.exp(log_action_prob - old_log_action_prob)
+                clip_adv = jnp.clip(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * old_advantage
+                unclip_adv = ratio * old_advantage
+                surrogate_loss = -(jnp.where(unclip_adv < clip_adv, unclip_adv, clip_adv)).mean()
 
                 entropy = -log_action_prob.mean()
 

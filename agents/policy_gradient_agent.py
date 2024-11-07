@@ -69,7 +69,7 @@ class ActorCriticContinuous(PolicyGradient):
     def sample_action(self, x, actor, key):
         mean, std = actor.apply_fn({'params': actor.params}, x)
 
-        z = jax.random.normal(key)
+        z = jax.random.normal(key, shape = std.shape)
         action = mean + z * std
         action_prob = normal_pdf(action, mean, std)
 
