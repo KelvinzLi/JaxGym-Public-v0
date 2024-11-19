@@ -1,0 +1,31 @@
+wandb_project_name = "PPO_Walker2d_sweep"
+
+train_python_file = "train_scripts.brax.PPO.train_ppo"
+
+[const]
+
+discount = 0.99
+
+ppo_steps = 4
+
+update_iters = 50_000
+
+train_rollout_steps = 20
+eval_rollout_steps = 1000
+eval_every = 400
+
+num_envs = 512
+
+hidden_size = 128
+num_layers = 2
+
+gae_factor = 0.95
+
+[var]
+
+env_name = ['walker2d'] # ['ant', 'halfcheetah', 'hopper']
+
+actor_lr = [1e-3, 5e-4, 2e-4, 1e-4, 5e-5, 1e-5]
+critic_lr = [1e-3, 5e-4, 2e-4, 1e-4, 5e-5, 1e-5]
+
+clip_ratio = [0.1, 0.2]

@@ -1,4 +1,4 @@
-wandb_project_name = "PPO_HalfCheetah_run"
+wandb_project_name = "PPO_Ant_run"
 
 train_python_file = "train_scripts.brax.PPO.train_ppo"
 
@@ -28,4 +28,4 @@ gae_factor = 0.95
 
 [var]
 
-env_name = ['halfcheetah'] # ['ant', 'halfcheetah', 'hopper']
+env_name = ['ant'] # ['ant', 'halfcheetah', 'hopper']
