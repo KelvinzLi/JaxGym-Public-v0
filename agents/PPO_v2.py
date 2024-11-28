@@ -8,10 +8,8 @@ from agents.policy_gradient_agent import PolicyGradient, ActorCriticDiscrete, Ac
 
 class PPO(PolicyGradient):
 
-    def __init__(self, advantage_estimator, return_estimator, clip_ratio, ppo_steps, target_kl = 0.01, entropy_coef = 0):
+    def __init__(self, advantage_estimator, clip_ratio, ppo_steps, target_kl = 0.01, entropy_coef = 0):
         super().__init__(advantage_estimator)
-
-        self.return_estimator = return_estimator
         
         self.clip_ratio = clip_ratio
         self.ppo_steps = ppo_steps
@@ -39,24 +37,16 @@ class PPO(PolicyGradient):
 
                 pred_return, log_action_prob = self.calculate_loss_components(actor, critic, actor_params, critic_params, obs, action, done = done)
 
-                # expected_return = jax.vmap(self.return_estimator, in_axes = (0, 0, 0))(pred_return, reward, done)
-                # expected_return = jax.lax.stop_gradient(expected_return)
-
                 critic_loss = jnp.square(pred_return - expected_return).mean() / 2.0
-
-                # threshold = jnp.where(old_advantage > 0, 1 + self.clip_ratio, 1 - self.clip_ratio)
-                # ratio = jnp.exp(log_action_prob - old_log_action_prob) # action_prob / old_action_prob
-
-                # surrogate_loss = -jnp.min(jnp.concatenate([ratio * old_advantage, threshold * old_advantage], axis = -1), axis = -1, keepdims = True)
 
                 ratio = jnp.exp(log_action_prob - old_log_action_prob)
                 clip_adv = jnp.clip(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * old_advantage
                 unclip_adv = ratio * old_advantage
                 surrogate_loss = -(jnp.where(unclip_adv < clip_adv, unclip_adv, clip_adv)).mean()
 
-                entropy = -log_action_prob.mean()
-
-                actor_loss = surrogate_loss.mean() - self.entropy_scheduler() * entropy
+                entropy = 0
+                
+                actor_loss = surrogate_loss.mean()
 
                 log_r = log_action_prob - old_log_action_prob
                 approx_kl = (jnp.exp(log_r) - 1 - log_r).mean()

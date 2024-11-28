@@ -50,7 +50,7 @@ class ActorCriticRNNContinuous(PolicyGradient):
     def sample_action(self, x, carry, done, actor, key):
         carry, (mean, std) = actor.apply_fn({'params': actor.params}, x, done, carry)
 
-        z = jax.random.normal(key)
+        z = jax.random.normal(key, shape = std.shape)
         action = mean + z * std
         action_prob = normal_pdf(action, mean, std)
 
